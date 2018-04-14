@@ -27,7 +27,7 @@ board points;
 
 void render(sf::RenderWindow& window)
 {
-    
+    window.clear(sf::Color(0,0,0));
     sf::RectangleShape rectangle;
     rectangle.setSize(sf::Vector2f(5, 5));
     rectangle.setFillColor(sf::Color(240,240,240));
@@ -38,6 +38,7 @@ void render(sf::RenderWindow& window)
         rectangle.setPosition(std::get<0>(p.first)*5,std::get<1>(p.first)*5);
         window.draw(rectangle);
     }
+    window.display();
 }
 
 void initialize_game()
@@ -97,7 +98,7 @@ int main() {
     initialize_game();
     
     bool quit = false;
-    int32_t delay = 1000;
+    auto delay = sf::milliseconds(1000);
     
     sf::Clock computeClock;
     sf::Clock renderClock;
@@ -114,25 +115,27 @@ int main() {
             }
             if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Down)
             {
-                delay += 100;
+                delay += sf::milliseconds(100);
             }                
             if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Up)
             {
-                if(delay > 100) {
-                    delay -= 100;
+                if(delay.asMilliseconds() >= 100) 
+                {
+                    delay -= sf::milliseconds(100);
                 }
             }                                
         }
         
-        window.clear(bgColor);
-        render(window);
-        window.display();
-        
         auto computeTime = computeClock.getElapsedTime();
-        if( computeTime.asMilliseconds() > delay) {
+        if( computeTime > delay) {
             compute_next_generation();
             computeClock.restart();
         }
+
+        
+        render(window);
+        
+        
         auto renderTime = renderClock.restart();
         if (renderTime.asMilliseconds() < minimumFrameTime) {
             sf::sleep(sf::milliseconds(minimumFrameTime - renderTime.asMilliseconds()));
