@@ -2,17 +2,22 @@
 
 #include <iostream>
 #include <exception>
-#include <SDL.h>
 #include <tuple>
 #include <unordered_map>
 
-#include "sdl_helpers.h"
+#include <SFML/System/Clock.hpp>
+#include <SFML/Window/Event.hpp>
+#include <SFML/Graphics.hpp>
+
+#include "hash.h"
 
 #define WINDOW_WIDTH  1000
 #define WINDOW_HEIGHT 1000
 
-const Uint32 fps = 60;
-const Uint32 minimumFrameTime = 1000 / fps;
+const int32_t fps = 60;
+const int32_t minimumFrameTime = 1000 / fps;
+
+
 
 typedef std::tuple<int,int> point;
 typedef std::unordered_map<point,int, hash_tuple::hash<point>> board;
@@ -20,33 +25,19 @@ typedef std::unordered_map<point,int, hash_tuple::hash<point>> board;
 board points;
 
 
-void render(renderer_ptr& sdl_renderer)
+void render(sf::RenderWindow& window)
 {
-    int width = 0 ;
-    int height = 0;  
-    if(SDL_GetRendererOutputSize(sdl_renderer.get(),&width,&height))
-    {
-        throw std::runtime_error(SDL_GetError());
-    }
     
-    Uint8 r = 0,b = 0,g = 0;
-    SDL_SetRenderDrawColor(sdl_renderer.get(),r,b,g,SDL_ALPHA_OPAQUE);
-    SDL_RenderClear(sdl_renderer.get());
+    sf::RectangleShape rectangle;
+    rectangle.setSize(sf::Vector2f(5, 5));
+    rectangle.setFillColor(sf::Color(240,240,240));
 
-    SDL_SetRenderDrawColor(sdl_renderer.get(),240,240,240,SDL_ALPHA_OPAQUE);
-    SDL_Rect rect;
-    rect.w = 5;
-    rect.h = 5;
     
     for(const auto& p : points)
     {
-        rect.x = std::get<0>(p.first)*5;
-        rect.y = std::get<1>(p.first)*5;        
-        SDL_RenderFillRect(sdl_renderer.get(),&rect);
+        rectangle.setPosition(std::get<0>(p.first)*5,std::get<1>(p.first)*5);
+        window.draw(rectangle);
     }
-    
-    
-    SDL_RenderPresent(sdl_renderer.get());
 }
 
 void initialize_game()
@@ -97,89 +88,59 @@ void compute_next_generation()
 }
 
 int main() {
-    window_ptr window(nullptr,sdl_window_deleter());  
+
     int return_value = 0;
     
-    try
+    sf::RenderWindow window(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT),"Game of Life",sf::Style::Default);
+    window.setVerticalSyncEnabled(true);
+    window.resetGLStates(); 
+    initialize_game();
+    
+    bool quit = false;
+    int32_t delay = 1000;
+    
+    sf::Clock computeClock;
+    sf::Clock renderClock;
+    sf::Color bgColor(0,0,0);
+    while(!quit)
     {
-        if(SDL_Init(SDL_INIT_EVERYTHING))
-        {
-            throw std::runtime_error(SDL_GetError());
-        }
-        SDL_LogSetAllPriority(SDL_LOG_PRIORITY_WARN); 
-        SDL_LogSetPriority(SDL_LOG_CATEGORY_RENDER,SDL_LOG_PRIORITY_DEBUG);
+        sf::Event event;
+        while (window.pollEvent(event)) {
 
-        window.reset(SDL_CreateWindow("Game of Life",
-                                    SDL_WINDOWPOS_CENTERED,
-                                    SDL_WINDOWPOS_CENTERED,
-                                    WINDOW_WIDTH, WINDOW_HEIGHT,
-                                    SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE));
-
-        if(!window)
-        {
-            throw std::runtime_error(SDL_GetError());
-        }
-        SDL_GLContext mContext = SDL_GL_GetCurrentContext();
-        SDL_GL_MakeCurrent(window.get(), mContext);    
-        
-        renderer_ptr  sdl_renderer(SDL_CreateRenderer(window.get(), -1, SDL_RENDERER_ACCELERATED|SDL_RENDERER_TARGETTEXTURE), sdl_renderer_deleter());
-        
-        initialize_game();
-        
-        SDL_Event event{0};
-        Uint32 frameTime;
-        bool quit = false;
-        Uint32 lastUpdate = SDL_GetTicks();
-        Uint32 speed = 1000;
-        while(!quit)
-        {
-            frameTime = SDL_GetTicks();
-            while(SDL_PollEvent(&event))
+            if (event.type == sf::Event::Closed ||
+                (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Q)
+            ) {
+                quit = true;
+            }
+            if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Down)
             {
-                switch(event.type)
-                {
-                    case SDL_QUIT:
-                    quit = true;
-                    break;
-                    case SDL_KEYDOWN:
-                        switch(event.key.keysym.sym ) 
-                        {
-                            case SDLK_q:
-                                quit = true;
-                                break;
-                            case SDLK_DOWN:
-                                speed += 100;
-                                break;
-                            case SDLK_UP:
-                                if(speed > 100) {
-                                    speed -= 100;
-                                }
-                                break;
-                        }
-                    break;
+                delay += 100;
+            }                
+            if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Up)
+            {
+                if(delay > 100) {
+                    delay -= 100;
                 }
-            }
-            render(sdl_renderer);
-            if( (SDL_GetTicks() - lastUpdate) > speed) {
-                compute_next_generation();
-                lastUpdate = SDL_GetTicks();
-            }
-    //        deltaTime = frameTime - lastFrameTime;
-    //        lastFrameTime = frameTime;
-         
-            if ((SDL_GetTicks() - frameTime) < minimumFrameTime) {
-                SDL_Delay(minimumFrameTime - (SDL_GetTicks() - frameTime));
-            }
+            }                                
         }
-
-    }
-    catch(const std::exception& e)
-    {
-        std::cout << e.what() << std::endl;
-        return_value = -1;
+        
+        window.clear(bgColor);
+        render(window);
+        window.display();
+        
+        auto computeTime = computeClock.getElapsedTime();
+        if( computeTime.asMilliseconds() > delay) {
+            compute_next_generation();
+            computeClock.restart();
+        }
+        auto renderTime = renderClock.restart();
+        if (renderTime.asMilliseconds() < minimumFrameTime) {
+            sf::sleep(sf::milliseconds(minimumFrameTime - renderTime.asMilliseconds()));
+        }
     }
     
-    SDL_Quit();
+    window.close();
+    
     return return_value;
 }
 

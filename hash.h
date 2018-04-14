@@ -1,33 +1,9 @@
-#ifndef TETRIS_SDL_HELPERS_H
-#define TETRIS_SDL_HELPERS_H
+#ifndef HASH_H
+#define HASH_H
 
-#include <SDL.h>
-#include <memory>
 #include <tuple>
 
-struct sdl_window_deleter
-{
-  void operator()(SDL_Window* win)
-  {
-    if(win != nullptr)
-    {
-      SDL_DestroyWindow(win);
-    }
-  }
-};
 
-struct sdl_renderer_deleter
-{
-  void operator()(SDL_Renderer* renderer)
-  {
-    if(renderer != nullptr)
-    {
-      SDL_DestroyRenderer(renderer);
-    }
-  }
-};
-typedef std::unique_ptr<SDL_Window,sdl_window_deleter> window_ptr;
-typedef std::unique_ptr<SDL_Renderer,sdl_renderer_deleter> renderer_ptr;
 
 namespace hash_tuple
 {
@@ -87,11 +63,7 @@ namespace hash_tuple
             return seed;                                 
         }                                              
     };    
-
-
-     
-      
-
 }
 
-#endif //TETRIS_SDL_HELPERS_H
+
+#endif 
